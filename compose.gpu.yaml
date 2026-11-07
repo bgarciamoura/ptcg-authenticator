@@ -1,0 +1,23 @@
+# Override para GPU NVIDIA (requer NVIDIA Container Toolkit).
+# Uso: docker compose -f compose.yaml -f compose.gpu.yaml up --build
+# Obs.: só o embedder (PyTorch/DINOv2) usa GPU; o OCR continua em CPU.
+x-gpu: &gpu
+  build:
+    args:
+      TORCH_INDEX_URL: https://download.pytorch.org/whl/cu121
+  image: card-authenticator:gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  api:
+    <<: *gpu
+  trainer:
+    <<: *gpu
+  tests-full:
+    <<: *gpu

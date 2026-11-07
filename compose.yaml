@@ -1,0 +1,55 @@
+name: card-authenticator
+
+# Imagem de inferência/treino (torch + docTR, pesos embutidos).
+x-runtime: &runtime
+  build:
+    context: .
+    target: runtime
+    args:
+      # o mesmo valor de DINO_MODEL do .env: o modelo precisa estar na imagem
+      DINO_MODEL: ${DINO_MODEL:-facebook/dinov2-small}
+  image: card-authenticator:latest
+  env_file:
+    - path: .env
+      required: false
+
+services:
+  # API de inferência + interface web em http://localhost:${API_PORT:-8088}
+  api:
+    <<: *runtime
+    volumes:
+      - ./data:/data:ro
+      - ./data/inferences:/data/inferences   # único diretório gravável: ciclo de dados
+      - ./models:/models:ro
+      - reference-cache:/cache/reference
+    ports:
+      # porta do host configurável via API_PORT no .env (8000 costuma estar ocupada)
+      - "127.0.0.1:${API_PORT:-8088}:8000"
+    restart: unless-stopped
+
+  # Jobs de treino/operação: docker compose run --rm trainer python -m app.train.<script>
+  trainer:
+    <<: *runtime
+    profiles: ["train"]
+    volumes:
+      - ./data:/data
+      - ./models:/models
+      - reference-cache:/cache/reference
+    command: ["python", "-m", "app.train.train"]
+
+  # Testes unitários: imagem leve, sem torch (segundos para buildar)
+  tests:
+    build:
+      context: .
+      target: test
+    image: card-authenticator:test
+    profiles: ["test"]
+
+  # Testes de integração: embedder e OCR reais na imagem runtime
+  tests-full:
+    <<: *runtime
+    profiles: ["test"]
+    command: ["pytest", "-m", "integration"]
+
+volumes:
+  reference-cache:

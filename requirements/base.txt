@@ -1,0 +1,11 @@
+# Dependências leves: API, pré-processamento e lógica dos modelos.
+# (opencv vem via requirements/test.txt (headless) ou via docTR (ml.txt))
+numpy==2.2.6
+pillow==10.4.0
+scikit-learn==1.5.2
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.12
+httpx==0.27.2
+pydantic-settings==2.5.2
+rapidfuzz==3.10.0

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verificador de Cartas</title>
+<style>
+  :root { --bg:#f6f5f2; --card:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e3e1dc;
+          --real:#1f8a4c; --fake:#c4302b; --unk:#b7791f; --accent:#2b5fd9; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#151517; --card:#1f1f22; --ink:#ececee; --muted:#9a9aa2; --line:#2e2e33; }
+  }
+  * { box-sizing:border-box }
+  body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--ink) }
+  main { max-width:960px; margin:0 auto; padding:24px 16px 48px }
+  h1 { font-size:22px; margin:0 0 4px } h3 { font-size:15px; margin:16px 0 6px } p.sub { color:var(--muted); margin:0 0 20px }
+  .drop { display:block; border:2px dashed var(--line); border-radius:12px; padding:28px; text-align:center;
+          background:var(--card); cursor:pointer }
+  .drop.over { border-color:var(--accent) }
+  .grid { display:grid; grid-template-columns: 260px 1fr; gap:20px; margin-top:20px }
+  @media (max-width:700px) { .grid { grid-template-columns:1fr } }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px }
+  img.prev { width:100%; border-radius:8px; display:block }
+  .verdict { font-size:26px; font-weight:700; text-transform:uppercase }
+  .v-real{color:var(--real)} .v-falsa{color:var(--fake)} .v-inconclusiva{color:var(--unk)}
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin:2px 0 10px }
+  .bar > span { display:block; height:100% }
+  .row { display:flex; justify-content:space-between; font-size:14px }
+  ul { padding-left:18px; margin:6px 0 } li { margin:2px 0 }
+  .muted { color:var(--muted); font-size:13px }
+  .warn { color:var(--unk) }
+  .fb { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px }
+  button { font:inherit; padding:6px 14px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer }
+  button.real { border-color:var(--real) } button.fake { border-color:var(--fake) }
+  button:disabled { opacity:.5; cursor:default }
+</style>
+</head>
+<body>
+<main>
+  <h1>Verificador de cartas Pokémon</h1>
+  <p class="sub">Envie uma foto nítida da frente da carta, de perto, sobre um fundo liso.</p>
+
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept="image/jpeg,image/png,image/webp" hidden>
+    <strong>Clique ou arraste uma imagem</strong><br><span class="muted">JPEG, PNG ou WEBP</span>
+  </label>
+
+  <div id="out"></div>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const color = (p) => p >= .65 ? "var(--fake)" : p <= .35 ? "var(--real)" : "var(--unk)";
+const LABELS = { visual:"Classificador visual", anomaly:"Anomalia (vs. reais)", reference:"Distância à imagem oficial", text:"Texto (OCR × oficial)" };
+
+async function send(file) {
+  $("#out").innerHTML = '<p class="muted">Analisando…</p>';
+  const fd = new FormData(); fd.append("file", file);
+  try {
+    const r = await fetch("/analyze", { method:"POST", body:fd });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || r.statusText);
+    render(data);
+  } catch (e) { $("#out").innerHTML = `<p class="v-falsa">Erro: ${esc(e.message)}</p>`; }
+}
+
+async function sendFeedback(id, label) {
+  const box = $("#fb-status");
+  document.querySelectorAll(".fb button").forEach(b => b.disabled = true);
+  try {
+    const r = await fetch(`/feedback/${encodeURIComponent(id)}`, {
+      method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ label }) });
+    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    box.textContent = `Registrado como ${label === "fake" ? "falsa" : "real"}; entra no treino após revisão. Obrigado!`;
+  } catch (e) {
+    box.textContent = `Erro: ${e.message}`;
+    document.querySelectorAll(".fb button").forEach(b => b.disabled = false);
+  }
+}
+
+function render(d) {
+  const sig = Object.entries(LABELS).map(([k, label]) => {
+    const v = d.signals[k];
+    return v == null
+      ? `<div class="row"><span>${label}</span><span class="muted">indisponível</span></div><div class="bar"></div>`
+      : `<div class="row"><span>${label}</span><span>${(v*100).toFixed(0)}%</span></div>
+         <div class="bar"><span style="width:${v*100}%;background:${color(v)}"></span></div>`;
+  }).join("");
+  const list = (arr, cls="") => arr.length ? `<ul class="${cls}">${arr.map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : '<p class="muted">nenhum</p>';
+  const ocr = d.ocr || {};
+  const ref = d.reference;
+  const res = d.px_per_mm != null ? `${d.px_per_mm} px/mm${d.texture_reliable ? "" : " (baixa)"}` : "—";
+  const refSim = ref && ref.similarity != null
+    ? `<p class="muted">Similaridade visual bruta: ${(ref.similarity*100).toFixed(0)}% · fonte ${esc(ref.source)}</p>` : "";
+  const fb = d.id ? `<h3>Esta carta é…</h3>
+      <div class="fb"><button class="real" onclick="sendFeedback('${esc(d.id)}','real')">Real</button>
+      <button class="fake" onclick="sendFeedback('${esc(d.id)}','fake')">Falsa</button>
+      <span class="muted" id="fb-status">${d.duplicate ? "Imagem já analisada antes. " : ""}Seu rótulo vira dado de treino após revisão.</span></div>` : "";
+  const t = d.timings_ms || {};
+  $("#out").innerHTML = `
+  <div class="grid">
+    <div class="panel"><img class="prev" src="data:image/jpeg;base64,${d.preview}" alt="carta retificada">
+      <p class="muted">${d.card_detected ? "Carta detectada e retificada" : "Carta não detectada"} · resolução ${esc(res)}</p></div>
+    <div class="panel">
+      <div class="verdict v-${esc(d.verdict)}">${esc(d.verdict)}</div>
+      <p class="muted">Probabilidade de ser falsa: ${d.fake_probability == null ? "—" : (d.fake_probability*100).toFixed(1) + "%"} · fusão ${esc(d.fusion)}${d.models.run ? " · modelos " + esc(d.models.run) : ""} · ${esc(t.total ?? "?")} ms</p>
+      <h3>Sinais</h3>${sig}
+      <h3>OCR${ocr.layout ? ` <span class="muted">(layout ${esc(ocr.layout)})</span>` : ""}</h3>
+      <p>${esc(ocr.name || "?")} · HP ${esc(ocr.hp ?? "?")} · ${esc(ocr.number || "?")}${ocr.total ? "/" + esc(ocr.total) : ""}</p>
+      ${ref ? `<h3>Referência oficial</h3><p>${esc(ref.name)} — ${esc(ref.set)} #${esc(ref.number)}</p>${refSim}` : ""}
+      <h3>Inconsistências de texto</h3>${list(d.text_issues)}
+      <h3>Avisos</h3>${list(d.warnings, "warn")}
+      ${fb}
+      <p class="muted">Triagem automática — não substitui verificação física (luz, espessura, textura).</p>
+    </div>
+  </div>`;
+}
+
+const drop = $("#drop");
+$("#file").addEventListener("change", (e) => e.target.files[0] && send(e.target.files[0]));
+["dragover","dragenter"].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => e.dataTransfer.files[0] && send(e.dataTransfer.files[0]));
+</script>
+</body>
+</html>

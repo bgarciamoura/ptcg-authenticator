@@ -1,0 +1,4 @@
+# Dependências pesadas da imagem de inferência/treino.
+# torch é instalado antes, separadamente (índice CPU ou CUDA via build arg).
+transformers==4.44.2
+python-doctr[torch]==1.1.0

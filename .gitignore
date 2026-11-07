@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+# dados e modelos ficam fora do git
+data/**
+!data/**/
+!data/**/.gitkeep
+models/*
+!models/.gitkeep

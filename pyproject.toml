@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Por padrão só os testes leves; `pytest -m integration` roda os pesados.
+addopts = "-q -p no:cacheprovider -m 'not integration'"
+markers = [
+    "integration: precisa de torch/transformers/paddle (imagem runtime)",
+]

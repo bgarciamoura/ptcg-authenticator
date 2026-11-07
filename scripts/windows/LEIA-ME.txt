@@ -1,0 +1,20 @@
+VERIFICADOR DE CARTAS POKEMON - scripts para Windows
+====================================================
+
+Clique duas vezes em:
+
+  iniciar.bat    liga o Docker (se preciso), sobe o projeto e abre o navegador
+  parar.bat      para o projeto
+  status.bat     mostra se tudo esta funcionando
+  ver-logs.bat   mostra o que a API esta fazendo (Ctrl+C para sair)
+  atualizar.bat  reconstroi a imagem depois de mudar o codigo
+
+Observacoes
+-----------
+- Na PRIMEIRA execucao a imagem e construida e os modelos sao baixados:
+  pode levar de 10 a 30 minutos. Nas proximas, menos de 1 minuto.
+- A pagina abre em http://localhost:8088
+- Esta pasta pode ser copiada para a Area de Trabalho: os scripts nao
+  dependem de onde estao. O caminho do projeto fica em ps\config.ps1.
+- Se aparecer "Distro nao encontrada", abra ps\config.ps1 no Bloco de Notas
+  e ajuste o nome da distro (veja com: wsl -l -q).
