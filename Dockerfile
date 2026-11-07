@@ -43,9 +43,15 @@ CMD ["pytest"]
 FROM base AS runtime
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
 ARG TORCH_VERSION=2.4.1
+ARG TORCHVISION_VERSION=0.19.1
 COPY requirements/ml.txt requirements/ml.txt
-RUN pip install "torch==${TORCH_VERSION}" --index-url "${TORCH_INDEX_URL}" \
-    && pip install -r requirements/ml.txt
+# torch/torchvision vêm do índice escolhido (CPU por padrão, ~200 MB). O
+# arquivo de constraints impede que o docTR (torchvision>=0.15 sem pin) puxe
+# um torchvision novo do PyPI e, com ele, um torch CUDA de vários GB.
+RUN pip install "torch==${TORCH_VERSION}" "torchvision==${TORCHVISION_VERSION}" --index-url "${TORCH_INDEX_URL}" \
+    && printf "torch==%s\ntorchvision==%s\n" "${TORCH_VERSION}" "${TORCHVISION_VERSION}" > /tmp/constraints.txt \
+    && PIP_CONSTRAINT=/tmp/constraints.txt pip install -r requirements/ml.txt \
+    && python -c "import torch, sys; v=torch.__version__; print('torch', v); sys.exit(0 if v.startswith('${TORCH_VERSION}') else 1)"
 
 # Pesos embutidos na imagem (DINOv2 via Hugging Face, docTR via CDN da Mindee).
 # A API recusa baixar em runtime, salvo ALLOW_MODEL_DOWNLOAD=true.
